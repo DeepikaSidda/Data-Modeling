@@ -57,20 +57,6 @@ The status-partitioned index (`Elig_PK` / `Promotion_Time`) showing `ELIGIBLE` a
 
 ![EligibilityIndex GSI](screenshots/04-eligibility-index.png)
 
-### 5. CONFIG item — production shard count
-The event `CONFIG` item showing `Shard_Count = 4000` (production sizing from the Scalability & Cost analysis).
-
-![CONFIG item with Shard_Count 4000](screenshots/05-config-shard-count.png)
-
-### 6. Live API — admit response
-`POST /admit` against the deployed API Gateway endpoint returning an Entry_Token and assigned shard.
-
-![Live admit API response](screenshots/06-live-admit.png)
-
-### 7. Live API — status before vs after promotion
-`GET /status` showing a fan going from `WAITING` (may_browse=false) to `ELIGIBLE` (may_browse=true) after a promotion cycle.
-
-![Live status before and after promotion](screenshots/07-live-status.png)
 
 ### 8. Load test results
 Bounded burst load test against real DynamoDB: exactly-once admissions, balanced shard distribution, and shard-count extrapolation to the full 10M burst.
