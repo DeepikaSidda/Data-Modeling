@@ -8,7 +8,7 @@ A DynamoDB-powered virtual waiting room that fairly queues up to **10,000,000 fa
 
 | # | Deliverable | File |
 |---|---|---|
-| 1 | **NoSQL Workbench data model** (`.json`) — table, GSIs, key schemas, sample data | [`nosql-workbench-model.json`](./nosql-workbench-model.json) |
+| 1 | **NoSQL Workbench data model** (`.json`) — table, GSIs, key schemas, sample data | [`nosql-workbench-model.json`](submission/nosql-workbench-model.json) |
 | 2 | **Design document** — why each decision was made + trade-offs | [`design-document.md`](./design-document.md) |
 | 3 | **Access pattern matrix** — every pattern → table/index, key condition, filter expression | [`access-pattern-matrix.md`](./access-pattern-matrix.md) |
 
