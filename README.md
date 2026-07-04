@@ -32,13 +32,7 @@ A judge-facing overview is in [submission/README.md](submission/README.md).
 - **No over-promotion** via an atomic capacity counter.
 - **Write sharding** with `Shard_Count = 4000` for the 10M-fan burst.
 
-## Development
 
-Requires Python 3.11+.
-
-```bash
-python -m pip install -e ".[test]"
-pytest
 ```
 
 ## Screenshots
