@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# AWS CDK build artifacts
+infra/cdk.out/
+cdk.out/
+infra/.venv/
+
+# Node (CDK CLI local installs, if any)
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local env / secrets (safety net — none are committed)
+.env
+*.pem
+aws-credentials*

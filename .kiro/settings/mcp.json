@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "dynamodb": {
+      "command": "uvx",
+      "args": ["awslabs.dynamodb-mcp-server@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "DDB-MCP-READONLY": "true"
+      },
+      "disabled": false,
+      "autoApprove": ["dynamodb_data_modeling"]
+    }
+  }
+}

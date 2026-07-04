@@ -1,0 +1,186 @@
+{
+  "ModelName": "VirtualWaitingRoom",
+  "ModelMetadata": {
+    "Author": "Kiro",
+    "DateCreated": "2024-01-01",
+    "DateLastModified": "2024-01-01",
+    "Description": "Single-table DynamoDB model for a Virtual Waiting Room. Absorbs a 10M-arrival burst via write sharding on the partition key, enforces exactly-once admission with a dedupe guard, promotes batches bounded by an atomic capacity counter, and serves low-latency status. Item types: queue entry, fan dedupe guard, sharded admit counter, capacity counter, event config. No LSIs are used (see design document for rationale); two GSIs serve all cross-shard/global access patterns. Shard_Count=4000 is the production sizing for a 10M/10s burst (keeps each WaitingIndex GSI partition ~250 WCU/s, well under the 1,000 WCU/s ceiling); see Scalability and Cost Analysis in the design document.",
+    "AWSService": "Amazon DynamoDB",
+    "Version": "3.0"
+  },
+  "DataModel": [
+    {
+      "TableName": "WaitingRoom",
+      "KeyAttributes": {
+        "PartitionKey": {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        },
+        "SortKey": {
+          "AttributeName": "SK",
+          "AttributeType": "S"
+        }
+      },
+      "NonKeyAttributes": [
+        { "AttributeName": "Fan_Id", "AttributeType": "S" },
+        { "AttributeName": "Event_Id", "AttributeType": "S" },
+        { "AttributeName": "Write_Shard", "AttributeType": "S" },
+        { "AttributeName": "Entry_Timestamp", "AttributeType": "N" },
+        { "AttributeName": "Ordering_Key", "AttributeType": "S" },
+        { "AttributeName": "Eligibility_Status", "AttributeType": "S" },
+        { "AttributeName": "Batch_Id", "AttributeType": "S" },
+        { "AttributeName": "Promotion_Time", "AttributeType": "N" },
+        { "AttributeName": "Waiting_Shard", "AttributeType": "S" },
+        { "AttributeName": "Elig_PK", "AttributeType": "S" },
+        { "AttributeName": "Admitted_Count", "AttributeType": "N" },
+        { "AttributeName": "Downstream_Capacity", "AttributeType": "N" },
+        { "AttributeName": "Eligible_Count", "AttributeType": "N" },
+        { "AttributeName": "Active_Count", "AttributeType": "N" },
+        { "AttributeName": "Promoted_Total", "AttributeType": "N" },
+        { "AttributeName": "Version", "AttributeType": "N" },
+        { "AttributeName": "Event_Status", "AttributeType": "S" },
+        { "AttributeName": "Shard_Count", "AttributeType": "N" },
+        { "AttributeName": "Max_Queue_Size", "AttributeType": "N" },
+        { "AttributeName": "Eligibility_Window_Secs", "AttributeType": "N" },
+        { "AttributeName": "Max_Batch_Size", "AttributeType": "N" },
+        { "AttributeName": "Active_Target", "AttributeType": "N" },
+        { "AttributeName": "ttl", "AttributeType": "N" }
+      ],
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "WaitingIndex",
+          "KeyAttributes": {
+            "PartitionKey": {
+              "AttributeName": "Waiting_Shard",
+              "AttributeType": "S"
+            },
+            "SortKey": {
+              "AttributeName": "Ordering_Key",
+              "AttributeType": "S"
+            }
+          },
+          "Projection": {
+            "ProjectionType": "INCLUDE",
+            "NonKeyAttributes": ["Fan_Id", "Entry_Timestamp"]
+          }
+        },
+        {
+          "IndexName": "EligibilityIndex",
+          "KeyAttributes": {
+            "PartitionKey": {
+              "AttributeName": "Elig_PK",
+              "AttributeType": "S"
+            },
+            "SortKey": {
+              "AttributeName": "Promotion_Time",
+              "AttributeType": "N"
+            }
+          },
+          "Projection": {
+            "ProjectionType": "INCLUDE",
+            "NonKeyAttributes": ["Fan_Id", "Batch_Id", "Write_Shard", "Ordering_Key"]
+          }
+        }
+      ],
+      "TableData": [
+        {
+          "PK": { "S": "EVT#e1#SH#0042" },
+          "SK": { "S": "ENTRY#0000001700000000123#a7f3c2" },
+          "Fan_Id": { "S": "f_98a" },
+          "Event_Id": { "S": "e1" },
+          "Write_Shard": { "S": "0042" },
+          "Entry_Timestamp": { "N": "1700000000123" },
+          "Ordering_Key": { "S": "0000001700000000123#a7f3c2" },
+          "Eligibility_Status": { "S": "WAITING" },
+          "Waiting_Shard": { "S": "EVT#e1#SH#0042" },
+          "ttl": { "N": "1700100000" }
+        },
+        {
+          "PK": { "S": "EVT#e1#SH#0042" },
+          "SK": { "S": "ENTRY#0000001700000000456#b2d9e1" },
+          "Fan_Id": { "S": "f_12c" },
+          "Event_Id": { "S": "e1" },
+          "Write_Shard": { "S": "0042" },
+          "Entry_Timestamp": { "N": "1700000000456" },
+          "Ordering_Key": { "S": "0000001700000000456#b2d9e1" },
+          "Eligibility_Status": { "S": "WAITING" },
+          "Waiting_Shard": { "S": "EVT#e1#SH#0042" },
+          "ttl": { "N": "1700100000" }
+        },
+        {
+          "PK": { "S": "EVT#e1#SH#0137" },
+          "SK": { "S": "ENTRY#0000001700000000099#c4a8f0" },
+          "Fan_Id": { "S": "f_7de" },
+          "Event_Id": { "S": "e1" },
+          "Write_Shard": { "S": "0137" },
+          "Entry_Timestamp": { "N": "1700000000099" },
+          "Ordering_Key": { "S": "0000001700000000099#c4a8f0" },
+          "Eligibility_Status": { "S": "ELIGIBLE" },
+          "Batch_Id": { "S": "B#01HXY" },
+          "Promotion_Time": { "N": "1700000005000" },
+          "Elig_PK": { "S": "EVT#e1#ELIGIBLE" },
+          "ttl": { "N": "1700100000" }
+        },
+        {
+          "PK": { "S": "EVT#e1#SH#0137" },
+          "SK": { "S": "ENTRY#0000001700000000050#d1b7c9" },
+          "Fan_Id": { "S": "f_3ab" },
+          "Event_Id": { "S": "e1" },
+          "Write_Shard": { "S": "0137" },
+          "Entry_Timestamp": { "N": "1700000000050" },
+          "Ordering_Key": { "S": "0000001700000000050#d1b7c9" },
+          "Eligibility_Status": { "S": "ACTIVE" },
+          "Batch_Id": { "S": "B#01HXY" },
+          "Promotion_Time": { "N": "1700000005000" },
+          "Elig_PK": { "S": "EVT#e1#ACTIVE" },
+          "ttl": { "N": "1700100000" }
+        },
+        {
+          "PK": { "S": "EVT#e1#SH#0042" },
+          "SK": { "S": "ADMIT_COUNT" },
+          "Event_Id": { "S": "e1" },
+          "Write_Shard": { "S": "0042" },
+          "Admitted_Count": { "N": "10842" }
+        },
+        {
+          "PK": { "S": "EVT#e1#FAN#f_98a" },
+          "SK": { "S": "ADMISSION" },
+          "Fan_Id": { "S": "f_98a" },
+          "Event_Id": { "S": "e1" },
+          "Ordering_Key": { "S": "0000001700000000123#a7f3c2" },
+          "Write_Shard": { "S": "0042" }
+        },
+        {
+          "PK": { "S": "EVT#e1#FAN#f_7de" },
+          "SK": { "S": "ADMISSION" },
+          "Fan_Id": { "S": "f_7de" },
+          "Event_Id": { "S": "e1" },
+          "Ordering_Key": { "S": "0000001700000000099#c4a8f0" },
+          "Write_Shard": { "S": "0137" }
+        },
+        {
+          "PK": { "S": "EVT#e1" },
+          "SK": { "S": "CAPACITY" },
+          "Event_Id": { "S": "e1" },
+          "Downstream_Capacity": { "N": "1000" },
+          "Eligible_Count": { "N": "120" },
+          "Active_Count": { "N": "860" },
+          "Promoted_Total": { "N": "54210" },
+          "Version": { "N": "54330" }
+        },
+        {
+          "PK": { "S": "EVT#e1" },
+          "SK": { "S": "CONFIG" },
+          "Event_Id": { "S": "e1" },
+          "Event_Status": { "S": "OPEN" },
+          "Shard_Count": { "N": "4000" },
+          "Max_Queue_Size": { "N": "10000000" },
+          "Eligibility_Window_Secs": { "N": "120" },
+          "Max_Batch_Size": { "N": "500" },
+          "Active_Target": { "N": "1000" }
+        }
+      ],
+      "BillingMode": "PAY_PER_REQUEST"
+    }
+  ]
+}
