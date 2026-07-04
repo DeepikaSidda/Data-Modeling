@@ -67,13 +67,6 @@ The design document frames every major decision as **decision → alternatives c
 
 ---
 
-## Verification (beyond the documents)
 
-This model was implemented and validated, not just diagrammed:
-
-- **Reference implementation** in Python (`../waiting_room/`) with the full data-access layer.
-- **69 automated tests pass**, including all **20 correctness properties** (property-based testing, ≥100 iterations each): exactly-once admission, total/deterministic ordering, capacity-bounded promotion, no over-promotion under concurrency, order-preserving promotion, lifecycle validity, and more.
-- **Live AWS deployment** (API Gateway + Lambda + DynamoDB + scheduled promoter, via CDK in `../infra/`) exercised end-to-end: admit → status(WAITING) → promote → status(ELIGIBLE) → expire.
-- **Bounded load test** against real DynamoDB confirming shard balance, exactly-once, and the shard-count sizing.
 
 > The implementation, tests, and infrastructure are bonus evidence. The three files above are the actual submission.
