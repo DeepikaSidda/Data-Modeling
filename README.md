@@ -12,7 +12,6 @@ The three required deliverables live in the [`submission/`](submission) folder:
 | 2 | **Design document** — why each decision was made + trade-offs | [submission/design-document.md](submission/design-document.md) |
 | 3 | **Access pattern matrix** — every pattern → table/index, key condition, filter expression | [submission/access-pattern-matrix.md](submission/access-pattern-matrix.md) |
 
-A judge-facing overview is in [submission/README.md](submission/README.md).
 
 ## Repository layout
 
