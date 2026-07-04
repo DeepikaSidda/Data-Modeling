@@ -57,8 +57,3 @@ The status-partitioned index (`Elig_PK` / `Promotion_Time`) showing `ELIGIBLE` a
 
 ![EligibilityIndex GSI](screenshots/04-eligibility-index.png)
 
-
-### 8. Load test results
-Bounded burst load test against real DynamoDB: exactly-once admissions, balanced shard distribution, and shard-count extrapolation to the full 10M burst.
-
-![Load test output](screenshots/08-load-test.png)
