@@ -35,25 +35,17 @@ A judge-facing overview is in [submission/README.md](submission/README.md).
 
 ## Screenshots
 
-> Place image files in a `screenshots/` folder (keep the filenames below, or update the paths). Each heading explains what the image shows.
+### 1. NoSQL Workbench — WaitingRoom table & attribute definitions
+The imported `WaitingRoom` model showing the base table with its `PK` / `SK` key schema and all attribute definitions.
 
-### 1. NoSQL Workbench — Aggregate view (table + both GSIs)
-The full model after import: the `WaitingRoom` table alongside `WaitingIndex` and `EligibilityIndex`.
+![NoSQL Workbench WaitingRoom attribute definitions](Screenshots/aws-nosql-workbench-virtualwaitingroom-attribute-d.png)
 
-![Aggregate view of the WaitingRoom model with both GSIs](screenshots/01-workbench-aggregate-view.png)
+### 2. WaitingIndex (sparse GSI) — primary key configuration
+The `WaitingIndex` GSI: partition key `Waiting_Shard`, sort key `Ordering_Key` (holds only `WAITING` entries for in-order, front-of-line reads).
 
-### 2. WaitingRoom table — items and attributes
-The base table with all item types (queue entries, `ADMIT_COUNT`, dedupe guards, `CAPACITY`, `CONFIG`) and the `PK` / `SK` key schema.
+![WaitingIndex primary key configuration](Screenshots/waitingindex-primary-key-configuration.png)
 
-![WaitingRoom base table data](screenshots/02-waitingroom-table.png)
+### 3. EligibilityIndex (GSI) — table & attribute definitions
+The `EligibilityIndex` GSI: partition key `Elig_PK`, sort key `Promotion_Time` (used for capacity accounting, the expiry sweep, and status-by-status queries).
 
-### 3. WaitingIndex (sparse GSI)
-Confirms the sparse index holds **only `WAITING`** entries — promoted entries are evicted when `Waiting_Shard` is removed.
-
-![WaitingIndex sparse GSI](screenshots/03-waiting-index.png)
-
-### 4. EligibilityIndex (GSI)
-The status-partitioned index (`Elig_PK` / `Promotion_Time`) showing `ELIGIBLE` and `ACTIVE` entries.
-
-![EligibilityIndex GSI](screenshots/04-eligibility-index.png)
-
+![EligibilityIndex table attribute definitions](Screenshots/eligibilityindex-table-attribute-definitions.png)
