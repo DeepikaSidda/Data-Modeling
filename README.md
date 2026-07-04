@@ -1,72 +1,86 @@
-# Virtual Waiting Room — DynamoDB Data Model Submission
+# Virtual Waiting Room (DynamoDB)
 
-A DynamoDB-powered virtual waiting room that fairly queues up to **10,000,000 fans arriving within seconds**, assigns each a verifiable position, promotes fans from **waiting → eligible** in capacity-bounded batches, and serves low-latency status to millions of concurrent pollers.
+A DynamoDB-powered virtual waiting room that fairly queues up to **10,000,000 fans arriving within seconds** for a high-demand ticket sale. It assigns each fan a verifiable queue position, promotes fans from `WAITING` to `ELIGIBLE` in capacity-bounded batches, and serves low-latency real-time status to millions of concurrent pollers.
 
----
+## Submission deliverables
 
-## Submission deliverables (start here)
+The three required deliverables live in the [`submission/`](submission) folder:
 
 | # | Deliverable | File |
 |---|---|---|
-| 1 | **NoSQL Workbench data model** (`.json`) — table, GSIs, key schemas, sample data | [`nosql-workbench-model.json`](submission/nosql-workbench-model.json) |
-| 2 | **Design document** — why each decision was made + trade-offs | [`design-document.md`](./design-document.md) |
-| 3 | **Access pattern matrix** — every pattern → table/index, key condition, filter expression | [`access-pattern-matrix.md`](./access-pattern-matrix.md) |
+| 1 | **NoSQL Workbench data model** — table, GSIs, key schemas, sample data | [submission/nosql-workbench-model.json](submission/nosql-workbench-model.json) |
+| 2 | **Design document** — why each decision was made + trade-offs | [submission/design-document.md](submission/design-document.md) |
+| 3 | **Access pattern matrix** — every pattern → table/index, key condition, filter expression | [submission/access-pattern-matrix.md](submission/access-pattern-matrix.md) |
 
-> Import the model via **NoSQL Workbench → Import model → NoSQL Workbench model** and select `nosql-workbench-model.json`.
+A judge-facing overview is in [submission/README.md](submission/README.md).
 
----
+## Repository layout
 
-## The model at a glance
+- [`waiting_room/`](waiting_room) — the Python package (pure-logic + DynamoDB data-access layers).
+- [`tests/`](tests) — pytest unit, property-based (Hypothesis), and integration (moto) tests.
+- [`infra/`](infra) — AWS CDK app (DynamoDB table, Lambdas, HTTP API, scheduled promoter).
+- [`scripts/`](scripts) — live smoke, live API, and load-test harnesses.
+- [`submission/`](submission) — the challenge deliverables.
 
-**Single table `WaitingRoom`** (on-demand billing) with an item-type taxonomy, **two GSIs, and zero LSIs** (the no-LSI choice is deliberate and justified in the design doc).
+## Design in brief
 
-| Item type | PK | SK |
-|---|---|---|
-| Queue entry | `EVT#<Event_Id>#SH#<shard>` | `ENTRY#<Ordering_Key>` |
-| Sharded admit counter | `EVT#<Event_Id>#SH#<shard>` | `ADMIT_COUNT` |
-| Fan dedupe guard | `EVT#<Event_Id>#FAN#<Fan_Id>` | `ADMISSION` |
-| Capacity counter | `EVT#<Event_Id>` | `CAPACITY` |
-| Event config | `EVT#<Event_Id>` | `CONFIG` |
+- **Single table `WaitingRoom`** (on-demand) with two GSIs and no LSIs.
+- **`WaitingIndex`** (sparse GSI, `Waiting_Shard` / `Ordering_Key`) — front-of-line reads in position order; holds only `WAITING` entries.
+- **`EligibilityIndex`** (GSI, `Elig_PK` / `Promotion_Time`) — capacity accounting, expiry sweep, status queries.
+- **Fair ordering:** `Ordering_Key = <HLC sequence>#<server random tie-breaker>` (skew-tolerant, gaming-resistant).
+- **Exactly-once admission** via `TransactWriteItems` + dedupe guard.
+- **No over-promotion** via an atomic capacity counter.
+- **Write sharding** with `Shard_Count = 4000` for the 10M-fan burst.
 
-- **`WaitingIndex`** (sparse GSI): PK `Waiting_Shard`, SK `Ordering_Key` — present **only while `WAITING`**, so the promoter reads a shrinking front-of-line in order with no filter/scan.
-- **`EligibilityIndex`** (GSI): PK `Elig_PK` (`EVT#<id>#<STATUS>`), SK `Promotion_Time` — capacity accounting, expiry sweep, status-by-status queries.
+## Development
 
----
+Requires Python 3.11+.
 
-## How it meets the four judging criteria
+```bash
+python -m pip install -e ".[test]"
+pytest
+```
 
-### 1. Completeness
-All required deliverables are present (above), and every challenge requirement is covered plus the stretch goal:
-- Table modeling the queue (fan id, position, entry timestamp, eligibility status, batch assignment) — ✅
-- Fair queue positioning with anti-gaming — ✅
-- Batch promotion strategy — ✅
-- Low-latency fan status queries — ✅
-- **Stretch:** steady ~1,000 active purchasers with incremental refill — ✅
+## Screenshots
 
-### 2. Data Model Correctness
-Every access pattern resolves through a key condition on the table or a GSI — **no `Scan`, no `FilterExpression`** anywhere (see the matrix). Status selection is pushed into the key schema (sparse `WaitingIndex`, status-encoded `Elig_PK`); identity lookups use token-derived primary keys. The model imports and renders correctly in NoSQL Workbench, and the same schema was exercised end-to-end against real DynamoDB (see *Verification* below).
+> Place image files in a `screenshots/` folder (keep the filenames below, or update the paths). Each heading explains what the image shows.
 
-### 3. Scalability & Cost
-- **Write burst:** partition key is `EVT#<Event_Id>#SH#<shard>`, sharded on `hash(Fan_Id)`. The binding constraint is the `WaitingIndex` GSI partition (1,000 WCU/s ceiling). The model ships **`Shard_Count = 4000`**, keeping each GSI partition ≈ 250 WCU/s at a 10M/10s burst.
-- **Cost:** writes are cheap (~$60 one-time for a full 10M ingest); the real driver is polling reads, which is why status is served from cache/edge with an O(1) position estimate. Full analysis in the design doc.
-- This is **empirically backed** — a load test confirmed shard balance and that 1,000 shards would exceed the ceiling (hence 4,000).
+### 1. NoSQL Workbench — Aggregate view (table + both GSIs)
+The full model after import: the `WaitingRoom` table alongside `WaitingIndex` and `EligibilityIndex`.
 
-### 4. Design Rationale
-The design document frames every major decision as **decision → alternatives considered → trade-off accepted**: single-table vs multi-table, write sharding & shard count, atomic capacity counter vs sharded counters, approximate vs exact position, HLC + random tie-breaker, sparse GSI vs status filtering, TTL vs authoritative expiry sweep, and the no-LSI choice.
+![Aggregate view of the WaitingRoom model with both GSIs](screenshots/01-workbench-aggregate-view.png)
 
----
+### 2. WaitingRoom table — items and attributes
+The base table with all item types (queue entries, `ADMIT_COUNT`, dedupe guards, `CAPACITY`, `CONFIG`) and the `PK` / `SK` key schema.
 
-## Key design decisions (one-liners)
+![WaitingRoom base table data](screenshots/02-waitingroom-table.png)
 
-- **Fair, gaming-proof ordering:** `Ordering_Key = <HLC sequence>#<server random tie-breaker>`. The Hybrid Logical Clock keeps ordering monotonic under clock skew; the server-side CSPRNG tie-breaker resolves same-instant arrivals unbiasably. All values are server-assigned — client input is ignored.
-- **Exactly-once admission:** a `TransactWriteItems` writes the queue entry + a conditional dedupe guard atomically, so a `(Event_Id, Fan_Id)` can never yield two entries.
-- **No over-promotion:** promotion reserves capacity against a single atomic `CAPACITY` counter (conditional update / optimistic version CAS), so concurrent promoters can never collectively exceed `Downstream_Capacity`.
-- **Batch sizing:** `min(waiting, Max_Batch_Size, remaining_capacity)`, selected in position order via the sparse `WaitingIndex` (k-way merge across shards).
-- **Low-latency status:** signed Entry_Token → single `GetItem` (no scan) + cached/approximate position + `Cache-Control: max-age` to absorb mass polling.
-- **Active-pool regulation (stretch):** drives `Active_Count` toward ~1,000, refilling incrementally as slots free, always bounded by capacity.
+### 3. WaitingIndex (sparse GSI)
+Confirms the sparse index holds **only `WAITING`** entries — promoted entries are evicted when `Waiting_Shard` is removed.
 
----
+![WaitingIndex sparse GSI](screenshots/03-waiting-index.png)
 
+### 4. EligibilityIndex (GSI)
+The status-partitioned index (`Elig_PK` / `Promotion_Time`) showing `ELIGIBLE` and `ACTIVE` entries.
 
+![EligibilityIndex GSI](screenshots/04-eligibility-index.png)
 
-> The implementation, tests, and infrastructure are bonus evidence. The three files above are the actual submission.
+### 5. CONFIG item — production shard count
+The event `CONFIG` item showing `Shard_Count = 4000` (production sizing from the Scalability & Cost analysis).
+
+![CONFIG item with Shard_Count 4000](screenshots/05-config-shard-count.png)
+
+### 6. Live API — admit response
+`POST /admit` against the deployed API Gateway endpoint returning an Entry_Token and assigned shard.
+
+![Live admit API response](screenshots/06-live-admit.png)
+
+### 7. Live API — status before vs after promotion
+`GET /status` showing a fan going from `WAITING` (may_browse=false) to `ELIGIBLE` (may_browse=true) after a promotion cycle.
+
+![Live status before and after promotion](screenshots/07-live-status.png)
+
+### 8. Load test results
+Bounded burst load test against real DynamoDB: exactly-once admissions, balanced shard distribution, and shard-count extrapolation to the full 10M burst.
+
+![Load test output](screenshots/08-load-test.png)
